@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrandChess Hub - Elite Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chess.js for move validation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <!-- Custom Theme / Glassmorphism Styling -->
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0f172a 60%, #020617 100%);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 0, 0.08);
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .chess-board { 
+            display: grid; 
+            grid-template-columns: repeat(8, 1fr); 
+            grid-template-rows: repeat(8, 1fr); 
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+        }
+        .square { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            cursor: pointer; 
+            user-select: none; 
+            position: relative; 
+            transition: background-color 0.15s ease; 
+        }
+        .piece-svg {
+            width: 82%;
+            height: 82%;
+            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
+            transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .piece-svg:hover {
+            transform: scale(1.1);
+        }
+        .highlight-selected { background-color: rgba(234, 179, 8, 0.45) !important; }
+        .highlight-move::after { 
+            content: ''; 
+            width: 26%; 
+            height: 26%; 
+            border-radius: 50%; 
+            background-color: rgba(0, 0, 0, 0.3); 
+            position: absolute; 
+        }
+        .highlight-capture::after { 
+            content: ''; 
+            width: 100%; 
+            height: 100%; 
+            border: 4px solid rgba(239, 68, 68, 0.7); 
+            border-radius: 6px;
+            position: absolute; 
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.5); border-radius: 3px; }
+    </style>
+</head>
+<body class="text-slate-100 h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="glass-panel px-6 py-3.5 flex justify-between items-center z-30 shrink-0 border-b border-slate-800/80">
+        <div class="flex items-center space-x-6">
+            <div class="flex items-center space-x-3 text-amber-400 font-extrabold text-xl tracking-wide">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-slate-950 shadow-lg shadow-amber-500/20 text-lg">
+                    <i class="fa-solid fa-chess-knight"></i>
+                </div>
+                <span>GrandChess Hub</span>
+            </div>
+            <nav class="hidden md:flex space-x-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+                <button onclick="switchTab('play')" id="nav-play" class="nav-btn px-4 py-2 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 shadow-md transition flex items-center space-x-2"><i class="fa-solid fa-play"></i><span>Play Arena</span></button>
+                <button onclick="switchTab('puzzles')" id="nav-puzzles" class="nav-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 transition hover:text-white hover:bg-slate-800 flex items-center space-x-2"><i class="fa-solid fa-puzzle-piece"></i><span>Tactics</span></button>
+                <button onclick="switchTab('coaches')" id="nav-coaches" class="nav-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 transition hover:text-white hover:bg-slate-800 flex items-center space-x-2"><i class="fa-solid fa-graduation-cap"></i><span>GM Coaches</span></button>
+                <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 transition hover:text-white hover:bg-slate-800 flex items-center space-x-2"><i class="fa-solid fa-palette"></i><span>Themes</span></button>
+            </nav>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <div id="profile-badge" onclick="openProfileSelector()" class="flex items-center space-x-3 bg-slate-800/80 hover:bg-slate-800 px-3.5 py-1.5 rounded-full cursor-pointer transition border border-slate-700/80 shadow-inner">
+                <div id="badge-avatar" class="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center font-bold text-sm shadow">👑</div>
+                <div class="text-left hidden sm:block">
+                    <div id="badge-profilename" class="text-xs font-bold leading-tight text-white">Select Profile</div>
+                    <div id="badge-email" class="text-[10px] text-slate-400 leading-tight">No Account</div>
+                </div>
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 ml-1"></i>
+            </div>
+            <button onclick="logoutAccount()" title="Sign Out" class="text-slate-400 hover:text-red-400 p-2.5 rounded-xl hover:bg-slate-800 transition"><i class="fa-solid fa-right-from-bracket"></i></button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 relative flex flex-col overflow-hidden">
+
+        <!-- VIEW: AUTH / GMAIL LOGIN -->
+        <div id="view-auth" class="absolute inset-0 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center z-50 p-4">
+            <div class="glass-card rounded-3xl p-8 max-w-md w-full shadow-2xl text-center border border-slate-700/50">
+                <div class="w-20 h-20 bg-amber-500/10 text-amber-400 rounded-3xl mx-auto flex items-center justify-center text-4xl mb-6 shadow-inner border border-amber-500/20">
+                    <i class="fa-solid fa-chess"></i>
+                </div>
+                <h1 class="text-2xl font-extrabold mb-2 text-white">GrandChess Elite</h1>
+                <p class="text-slate-400 text-xs mb-8 leading-relaxed">Sign in with a Gmail simulated account to manage multi-player Netflix-style profiles, bots, grandmaster mentors, and puzzle streaks.</p>
+                
+                <button onclick="simulateGmailLogin()" class="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center space-x-3 transition shadow-xl hover:scale-[1.02]">
+                    <i class="fa-brands fa-google text-red-500 text-lg"></i>
+                    <span class="text-sm">Continue with Google Gmail</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- VIEW: NETFLIX-STYLE PROFILE SELECTOR -->
+        <div id="view-profiles" class="absolute inset-0 bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center z-40 p-4 hidden">
+            <div class="max-w-3xl w-full text-center">
+                <h1 class="text-4xl font-extrabold mb-3 tracking-tight text-white">Who's playing?</h1>
+                <p class="text-slate-400 mb-10 text-xs">Select your profile linked to <span id="current-gmail-display" class="text-amber-400 font-semibold">user@gmail.com</span></p>
+                
+                <div id="profiles-grid" class="flex flex-wrap justify-center gap-6 mb-12">
+                    <!-- Dynamic Profile Cards -->
+                </div>
+
+                <div class="flex justify-center space-x-4">
+                    <button onclick="openAddProfileModal()" class="glass-card hover:bg-slate-800 text-slate-200 px-6 py-3 rounded-2xl text-xs font-bold transition flex items-center space-x-2 border border-slate-700">
+                        <i class="fa-solid fa-user-plus text-amber-400"></i>
+                        <span>Add Netflix Profile</span>
+                    </button>
+                    <button onclick="logoutAccount()" class="px-6 py-3 rounded-2xl text-xs font-semibold text-slate-400 hover:text-white transition">
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: PLAY ARENA -->
+        <div id="view-play" class="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
+            <!-- Left Side / Chessboard Arena -->
+            <div class="flex-1 flex flex-col items-center justify-center p-3 relative bg-slate-900/30 overflow-hidden">
+                
+                <!-- Opponent Header Bar -->
+                <div class="w-full max-w-[620px] flex justify-between items-center mb-2.5 px-3 py-2 rounded-xl glass-card shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <div id="opponent-avatar" class="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-lg shadow border border-slate-700">🤖</div>
+                        <div>
+                            <div id="opponent-name" class="font-bold text-xs text-white">Stockfish Bot</div>
+                            <div id="opponent-rating" class="text-[10px] text-slate-400 font-medium">Rating: 1500</div>
+                        </div>
+                    </div>
+                    <div id="game-eval" class="bg-slate-900/80 px-3 py-1 rounded-lg text-xs font-mono font-bold text-amber-400 border border-slate-800">Equal (+0.0)</div>
+                </div>
+
+                <!-- Chessboard Container -->
+                <div class="relative shadow-2xl rounded-2xl overflow-hidden border-4 border-slate-700/80 bg-slate-900 flex items-center justify-center shadow-amber-500/5">
+                    <div id="chessboard" class="chess-board w-[min(72vw,66vh)] h-[min(72vw,66vh)] max-w-[580px] max-h-[580px]"></div>
+                </div>
+
+                <!-- Player Footer Bar -->
+                <div class="w-full max-w-[620px] flex justify-between items-center mt-2.5 px-3 py-2 rounded-xl glass-card shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <div id="player-avatar" class="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center text-base font-bold shadow border border-amber-400">👑</div>
+                        <div>
+                            <div id="player-name" class="font-bold text-xs text-white">Player Profile</div>
+                            <div id="player-rating" class="text-[10px] text-slate-400 font-medium">Rating: 1200</div>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="undoMove()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-700 transition flex items-center space-x-1.5"><i class="fa-solid fa-rotate-left text-amber-400"></i><span>Undo</span></button>
+                        <button onclick="resignGame()" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-800/40 transition flex items-center space-x-1.5"><i class="fa-solid fa-flag"></i><span>Resign</span></button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Side / Game Controls & Setup Pane -->
+            <div class="w-full md:w-96 glass-panel border-l border-slate-800 flex flex-col h-full shadow-2xl shrink-0">
+                <div class="flex border-b border-slate-800 p-2 bg-slate-950/40 shrink-0">
+                    <button onclick="switchPlayTab('setup')" id="playtab-setup" class="flex-1 py-2 text-xs font-bold rounded-xl bg-amber-500 text-slate-950 transition shadow">New Match</button>
+                    <button onclick="switchPlayTab('moves')" id="playtab-moves" class="flex-1 py-2 text-xs font-bold rounded-xl text-slate-400 hover:text-white transition">Move History</button>
+                </div>
+
+                <!-- Setup Pane -->
+                <div id="pane-setup" class="flex-1 p-5 overflow-y-auto space-y-5">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Game Mode</label>
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <button onclick="setGameMode('bot')" id="mode-bot" class="p-3.5 rounded-xl border border-amber-500 bg-amber-500/10 text-amber-400 font-bold text-xs flex flex-col items-center justify-center transition shadow">
+                                <i class="fa-solid fa-robot text-lg mb-1.5"></i>
+                                <span>Play vs Bot</span>
+                            </button>
+                            <button onclick="setGameMode('local')" id="mode-local" class="p-3.5 rounded-xl border border-slate-800 bg-slate-900/50 text-slate-400 font-bold text-xs flex flex-col items-center justify-center transition hover:border-slate-700">
+                                <i class="fa-solid fa-user-group text-lg mb-1.5"></i>
+                                <span>Pass & Play</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Bot Selection -->
+                    <div id="bot-selection-container">
+                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Select Computer Bot</label>
+                        <div id="bots-list" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+                            <!-- Injected Bots -->
+                        </div>
+                    </div>
+
+                    <!-- Color Picker -->
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Play As Color</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="setPlayerColor('white')" id="color-white" class="py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs border border-amber-500 transition shadow">White</button>
+                            <button onclick="setPlayerColor('random')" id="color-random" class="py-2.5 rounded-xl bg-slate-900/50 text-slate-400 font-bold text-xs border border-slate-800 transition">Random</button>
+                            <button onclick="setPlayerColor('black')" id="color-black" class="py-2.5 rounded-xl bg-slate-900/50 text-slate-400 font-bold text-xs border border-slate-800 transition">Black</button>
+                        </div>
+                    </div>
+
+                    <button onclick="startNewGame()" class="w-full bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-extrabold py-3.5 rounded-xl shadow-xl transition flex items-center justify-center space-x-2 text-sm">
+                        <i class="fa-solid fa-play"></i>
+                        <span>Start Match</span>
+                    </button>
+                </div>
+
+                <!-- Moves Pane -->
+                <div id="pane-moves" class="flex-1 p-5 overflow-y-auto hidden flex-col">
+                    <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Notation History</div>
+                    <div id="moves-list" class="flex-1 font-mono text-xs space-y-1.5 bg-slate-900/70 p-3.5 rounded-2xl border border-slate-800 overflow-y-auto">
+                        <!-- Moves appended here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: PUZZLES -->
+        <div id="view-puzzles" class="flex-1 flex flex-col md:flex-row h-full overflow-hidden hidden">
+            <div class="flex-1 flex flex-col items-center justify-center p-4 bg-slate-900/30">
+                <div class="w-full max-w-[520px] flex justify-between items-center mb-3 px-2">
+                    <div>
+                        <h2 id="puzzle-title" class="font-extrabold text-base text-amber-400">Tactical Puzzle #1</h2>
+                        <p id="puzzle-desc" class="text-xs text-slate-400">Find the precise winning continuation.</p>
+                    </div>
+                    <div id="puzzle-status" class="glass-card px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-200 border border-slate-700">Your Turn (White)</div>
+                </div>
+
+                <div class="relative shadow-2xl rounded-2xl overflow-hidden border-4 border-slate-700 bg-slate-900">
+                    <div id="puzzle-board" class="chess-board w-[340px] h-[340px] sm:w-[460px] sm:h-[460px]"></div>
+                </div>
+
+                <div class="w-full max-w-[520px] flex justify-between items-center mt-3 px-2">
+                    <button onclick="nextPuzzle()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl text-xs font-bold border border-slate-700 transition">Next Puzzle</button>
+                    <div class="text-xs text-slate-400 font-medium">Solved Streak: <span id="puzzles-solved-count" class="text-amber-400 font-bold">0</span></div>
+                </div>
+            </div>
+
+            <div class="w-full md:w-80 glass-panel border-l border-slate-800 p-6 flex flex-col justify-between">
+                <div>
+                    <h3 class="font-extrabold text-sm mb-3 flex items-center text-amber-400"><i class="fa-solid fa-lightbulb mr-2"></i>Tactical Trainer</h3>
+                    <p class="text-xs text-slate-300 leading-relaxed mb-5">Daily tactical puzzles sharpen calculation and pattern recognition.</p>
+                    <div class="glass-card p-4 rounded-2xl border border-slate-800 space-y-3">
+                        <div class="flex justify-between text-xs"><span class="text-slate-400">Puzzle Rating:</span><span class="font-bold text-amber-400">1450</span></div>
+                        <div class="flex justify-between text-xs"><span class="text-slate-400">Accuracy:</span><span class="font-bold text-emerald-400">94.2%</span></div>
+                    </div>
+                </div>
+                <button onclick="hintPuzzle()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold py-3 rounded-xl transition border border-slate-700">Get Puzzle Hint</button>
+            </div>
+        </div>
+
+        <!-- VIEW: GM COACHES -->
+        <div id="view-coaches" class="flex-1 flex flex-col md:flex-row h-full overflow-hidden hidden">
+            <!-- Coaches Sidebar -->
+            <div class="w-full md:w-80 glass-panel border-r border-slate-800 flex flex-col h-full">
+                <div class="p-4 border-b border-slate-800 font-extrabold text-xs uppercase tracking-wider text-amber-400 flex items-center">
+                    <i class="fa-solid fa-graduation-cap mr-2"></i>Grandmaster Mentors
+                </div>
+                <div id="coaches-list" class="flex-1 overflow-y-auto p-3 space-y-2.5">
+                    <!-- Coaches Injected -->
+                </div>
+            </div>
+
+            <!-- Coach Chat Window -->
+            <div class="flex-1 flex flex-col bg-slate-900/40">
+                <div class="p-4 glass-panel border-b border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div id="active-coach-avatar" class="w-11 h-11 rounded-2xl bg-amber-500/10 text-amber-400 font-extrabold flex items-center justify-center text-xl border border-amber-500/30">👑</div>
+                        <div>
+                            <div id="active-coach-name" class="font-extrabold text-sm text-white">Select a Coach</div>
+                            <div id="active-coach-title" class="text-xs text-slate-400 font-medium">Real-Life Grandmaster Mentor</div>
+                        </div>
+                    </div>
+                    <button onclick="openHireCoachModal()" class="bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-extrabold transition shadow-lg">
+                        <i class="fa-solid fa-coins mr-1.5"></i>Book Paid Lesson
+                    </button>
+                </div>
+
+                <div id="coach-chat-messages" class="flex-1 p-5 overflow-y-auto space-y-4 text-xs font-normal">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-bold shrink-0 border border-slate-700">GM</div>
+                        <div class="glass-card border border-slate-700/80 p-3.5 rounded-2xl max-w-md text-slate-200 leading-relaxed shadow">
+                            Welcome! Select any Grandmaster mentor from the left to ask opening preparation questions, review your positional understanding, or book private training sessions.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 glass-panel border-t border-slate-800 flex space-x-3">
+                    <input type="text" id="coach-input" placeholder="Ask your Grandmaster coach about strategy, openings, endgames..." onkeydown="if(event.key==='Enter')sendCoachMessage()" class="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-amber-500 text-slate-100 shadow-inner">
+                    <button onclick="sendCoachMessage()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 px-5 rounded-xl font-bold transition shadow"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: THEMES & CUSTOMIZATION -->
+        <div id="view-settings" class="flex-1 p-6 overflow-y-auto max-w-4xl mx-auto w-full hidden">
+            <h1 class="text-2xl font-extrabold mb-6 flex items-center text-white"><i class="fa-solid fa-palette text-amber-400 mr-3"></i>Board & Piece Themes</h1>
+            
+            <div class="space-y-6">
+                <div class="glass-card p-6 rounded-3xl border border-slate-800 shadow-xl">
+                    <h3 class="font-extrabold text-sm mb-4 text-amber-400">Board Color Themes</h3>
+                    <div id="board-themes-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <!-- Themes Injected -->
+                    </div>
+                </div>
+
+                <div class="glass-card p-6 rounded-3xl border border-slate-800 shadow-xl">
+                    <h3 class="font-extrabold text-sm mb-4 text-amber-400">Piece Style Design</h3>
+                    <div id="piece-themes-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        <!-- Piece Styles Injected -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL: ADD NETFLIX PROFILE -->
+    <div id="modal-add-profile" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 hidden p-4">
+        <div class="glass-card rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-700">
+            <h3 class="font-extrabold text-lg mb-4 text-white">Create Netflix Profile</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Profile Name</label>
+                    <input type="text" id="new-profile-name" placeholder="e.g. BlitzGrandmaster" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-100 focus:outline-none focus:border-amber-500 shadow-inner">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Avatar Icon</label>
+                    <select id="new-profile-emoji" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+                        <option value="👑">👑 Royal Crown</option>
+                        <option value="🦁">🦁 Tactical Lion</option>
+                        <option value="🚀">🚀 Speed Blitz</option>
+                        <option value="⚡">⚡ Lightning Bolt</option>
+                        <option value="🦊">🦊 Sly Fox</option>
+                        <option value="🧙‍♂️">🧙‍♂️ Grand Wizard</option>
+                    </select>
+                </div>
+                <div class="flex space-x-2.5 pt-2">
+                    <button onclick="closeAddProfileModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-3 rounded-xl text-xs font-bold transition">Cancel</button>
+                    <button onclick="createProfile()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 py-3 rounded-xl text-xs font-extrabold transition shadow">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: HIRE COACH PAYMENT -->
+    <div id="modal-hire-coach" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 hidden p-4">
+        <div class="glass-card rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-coach-title" class="font-extrabold text-base text-amber-400">Book Coaching Session</h3>
+                <button onclick="closeHireCoachModal()" class="text-slate-400 hover:text-white p-2"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <p class="text-xs text-slate-300 mb-5 leading-relaxed">Book 1-on-1 private live sparring analysis, opening prep, and endgame mastery directly from this Grandmaster.</p>
+            <div class="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 mb-6 space-y-2.5 shadow-inner">
+                <div class="flex justify-between text-xs"><span class="text-slate-400">Session Type:</span><span class="font-bold text-white">1 Hour Live Masterclass</span></div>
+                <div class="flex justify-between text-xs"><span class="text-slate-400">Mentor Fee:</span><span class="font-extrabold text-amber-400">$49.00 / session</span></div>
+            </div>
+            <button onclick="confirmHireCoach()" class="w-full bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 py-3.5 rounded-xl font-extrabold text-xs shadow-xl transition flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-credit-card"></i>
+                <span>Complete Secure Payment & Book</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Application JS Logic -->
+    <script>
+        let state = {
+            gmail: null,
+            profiles: [],
+            activeProfileId: null,
+            gameMode: 'bot',
+            playerColor: 'white',
+            selectedBot: 'martin',
+            activeCoach: 'magnus',
+            boardTheme: 'walnut',
+            pieceTheme: 'svg_3d'
+        };
+
+        const bots = [
+            { id: 'martin', name: 'Martin', rating: 250, desc: 'Friendly beginner who loves hanging pieces.', emoji: '🤖', elo: 250 },
+            { id: 'nelson', name: 'Nelson', rating: 1300, desc: 'Loves queen checks and tactical surprises.', emoji: '🦁', elo: 1300 },
+            { id: 'antonio', name: 'Antonio', rating: 1500, desc: 'Solid positional player from Italy.', emoji: '🍕', elo: 1500 },
+            { id: 'stockfish_lite', name: 'Stockfish Lite', rating: 2000, desc: 'Brutal calculation engine.', emoji: '⚙️', elo: 2000 }
+        ];
+
+        const coaches = [
+            { id: 'magnus', name: 'GM Magnus C.', title: 'World Chess Champion', desc: 'Expert in endgame technique and universal play style.', emoji: '👑', rating: 2882 },
+            { id: 'hikaru', name: 'GM Hikaru N.', title: 'Blitz & Rapid Legend', desc: 'Specialist in tactical wizardry, opening traps, and speed chess.', emoji: '🔥', rating: 2800 },
+            { id: 'judit', name: 'GM Judit Polgár', title: 'Strongest Female Player', desc: 'Fierce attacking chess and sacrificial combinations.', emoji: '⚡', rating: 2735 },
+            { id: 'botez', name: 'WFM Alexandra B.', title: 'Chess Streamer & Coach', desc: 'Clear strategic guidance and friendly learning environment.', emoji: '🎙️', rating: 2050 }
+        ];
+
+        const boardThemes = [
+            { id: 'walnut', name: 'Walnut Elite', light: '#ebd9b4', dark: '#b58863' },
+            { id: 'obsidian', name: 'Obsidian Dark', light: '#334155', dark: '#1e293b' },
+            { id: 'emerald', name: 'Emerald Luxe', light: '#eef2ff', dark: '#059669' },
+            { id: 'neo', name: 'Neo Minimalist', light: '#f1f5f9', dark: '#64748b' }
+        ];
+
+        // Gorgeous Crisp SVG Vector Chess Pieces
+        const svgPieces = {
+            w: {
+                p: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.32 1.71.85 2.34C17.42 16.56 16 18.6 16 21c0 1.95.89 3.69 2.28 4.88C17.27 27.23 16 29.41 16 32h13c0-2.59-1.27-4.77-2.28-6.12C28.11 24.69 29 22.95 29 21c0-2.4-1.42-4.44-3.35-5.66.53-.63.85-1.45.85-2.34 0-2.21-1.79-4-4-4z" fill="#f8fafc" stroke="#0f172a" stroke-width="1.5"/></svg>',
+                r: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M9 39h27v-3H9v3zm3-3v-4h21v4H12zm1-6h19l-2-13H15l-2 13zm-1-15h21V11H12v9z" fill="#f8fafc" stroke="#0f172a" stroke-width="1.5"/></svg>',
+                n: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M22 10c10.5 1 16.5 8 16 20H10c0-6 4-12 12-20zM12 33h21v3H12v-3z" fill="#f8fafc" stroke="#0f172a" stroke-width="1.5"/></svg>',
+                b: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M9 36c0 0 2-11 13.5-13.5C34 25 36 36 36 36H9z" fill="#f8fafc" stroke="#0f172a" stroke-width="1.5"/></svg>',
+                q: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M8 12l6 18h17l6-18-8 12-8-15-8 15-8-12z" fill="#f8fafc" stroke="#0f172a" stroke-width="1.5"/></svg>',
+                k: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M22.5 8v6m-3-3h6M10 35h25v3H10v-3zM13 18h19l-3 15H16l-3-15z" fill="#f8fafc" stroke="#0f172a" stroke-width="1.5"/></svg>'
+            },
+            b: {
+                p: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.32 1.71.85 2.34C17.42 16.56 16 18.6 16 21c0 1.95.89 3.69 2.28 4.88C17.27 27.23 16 29.41 16 32h13c0-2.59-1.27-4.77-2.28-6.12C28.11 24.69 29 22.95 29 21c0-2.4-1.42-4.44-3.35-5.66.53-.63.85-1.45.85-2.34 0-2.21-1.79-4-4-4z" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/></svg>',
+                r: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M9 39h27v-3H9v3zm3-3v-4h21v4H12zm1-6h19l-2-13H15l-2 13zm-1-15h21V11H12v9z" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/></svg>',
+                n: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M22 10c10.5 1 16.5 8 16 20H10c0-6 4-12 12-20zM12 33h21v3H12v-3z" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/></svg>',
+                b: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M9 36c0 0 2-11 13.5-13.5C34 25 36 36 36 36H9z" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/></svg>',
+                q: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M8 12l6 18h17l6-18-8 12-8-15-8 15-8-12z" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/></svg>',
+                k: '<svg viewBox="0 0 45 45" class="piece-svg"><path d="M22.5 8v6m-3-3h6M10 35h25v3H10v-3zM13 18h19l-3 15H16l-3-15z" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5"/></svg>'
+            }
+        };
+
+        const minimalPieces = {
+            w: {p:'P', r:'R', n:'N', b:'B', q: 'Q', k: 'K'},
+            b: {p:'p', r:'r', n:'n', b:'b', q: 'q', k: 'k'}
+        };
+
+        let chess = new Chess();
+        let selectedSquare = null;
+        let possibleMoves = [];
+        let puzzleGame = null;
+        let currentPuzzleIndex = 0;
+
+        const puzzlesList = [
+            { fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', solution: ['f3e5', 'c6e5', 'd2d4'], title: 'Center Fork Trick', desc: 'Punish premature development with a tactical strike.' },
+            { fen: 'r1bqkb1r/pppp1ppp/2n5/4p1n1/2B1P3/8/PPPP1PPP/RNBQ1RK1 w kq - 2 6', solution: ['c4f7', 'e8f7', 'd1h5'], title: 'Weak F7 Square', desc: 'Exploit the vulnerable f7 pawn near the enemy king.' }
+        ];
+
+        window.onload = function() {
+            loadLocalStorage();
+            renderThemes();
+            renderBots();
+            renderCoaches();
+            
+            if (!state.gmail) {
+                showView('auth');
+            } else if (!state.activeProfileId) {
+                showView('profiles');
+                renderProfiles();
+            } else {
+                showView('play');
+                initGame();
+            }
+        };
+
+        function loadLocalStorage() {
+            const saved = localStorage.getItem('grandchess_elite_state');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    state = { ...state, ...parsed };
+                } catch(e) {}
+            }
+        }
+
+        function saveLocalStorage() {
+            localStorage.setItem('grandchess_elite_state', JSON.stringify(state));
+        }
+
+        function switchTab(tabId) {
+            ['play', 'puzzles', 'coaches', 'settings'].forEach(t => {
+                const viewEl = document.getElementById(`view-${t}`);
+                if (viewEl) viewEl.classList.add('hidden');
+                const navBtn = document.getElementById(`nav-${t}`);
+                if (navBtn) {
+                    navBtn.className = "nav-btn px-4 py-2 rounded-lg text-xs font-semibold text-slate-300 transition hover:text-white hover:bg-slate-800 flex items-center space-x-2";
+                }
+            });
+            const targetView = document.getElementById(`view-${tabId}`);
+            if (targetView) targetView.classList.remove('hidden');
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeNav) {
+                activeNav.className = "nav-btn px-4 py-2 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 shadow-md transition flex items-center space-x-2";
+            }
+
+            if (tabId === 'puzzles' && !puzzleGame) {
+                initPuzzle();
+            }
+        }
+
+        function simulateGmailLogin() {
+            const emailNames = ['alex.chess99@gmail.com', 'grandmaster.elite@gmail.com', 'blitzkrieg.master@gmail.com'];
+            state.gmail = emailNames[Math.floor(Math.random() * emailNames.length)];
+            
+            if (!state.profiles || state.profiles.length === 0) {
+                state.profiles = [
+                    { id: 'p1', name: 'Elite Champion', emoji: '👑', rating: 1350 },
+                    { id: 'p2', name: 'Blitz Prodigy', emoji: '⚡', rating: 1120 }
+                ];
+            }
+            state.activeProfileId = state.profiles[0].id;
+            saveLocalStorage();
+            
+            showView('profiles');
+            renderProfiles();
+        }
+
+        function logoutAccount() {
+            state.gmail = null;
+            state.activeProfileId = null;
+            saveLocalStorage();
+            showView('auth');
+        }
+
+        function showView(viewId) {
+            ['auth', 'profiles', 'play', 'puzzles', 'coaches', 'settings'].forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                if (el) {
+                    if (v === viewId) el.classList.remove('hidden');
+                    else el.classList.add('hidden');
+                }
+            });
+
+            if (['play', 'puzzles', 'coaches'].includes(viewId)) {
+                updateProfileBadge();
+            }
+        }
+
+        function renderProfiles() {
+            document.getElementById('current-gmail-display').innerText = state.gmail;
+            const container = document.getElementById('profiles-grid');
+            container.innerHTML = '';
+            
+            state.profiles.forEach(p => {
+                const card = document.createElement('div');
+                card.className = "group cursor-pointer flex flex-col items-center p-5 rounded-3xl glass-card hover:bg-slate-800 transition duration-200 w-36 border border-slate-700/80 hover:border-amber-500 shadow-xl";
+                card.onclick = () => selectProfile(p.id);
+                card.innerHTML = `
+                    <div class="w-20 h-20 rounded-2xl bg-slate-900 border border-slate-700 group-hover:border-amber-500 flex items-center justify-center text-3xl shadow-inner transition mb-3">${p.emoji}</div>
+                    <div class="font-bold text-xs text-slate-200 group-hover:text-white truncate w-full text-center">${p.name}</div>
+                    <div class="text-[10px] text-slate-400 mt-0.5">Rating: ${p.rating}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function selectProfile(profileId) {
+            state.activeProfileId = profileId;
+            saveLocalStorage();
+            switchTab('play');
+            initGame();
+        }
+
+        function openProfileSelector() {
+            showView('profiles');
+            renderProfiles();
+        }
+
+        function openAddProfileModal() {
+            document.getElementById('modal-add-profile').classList.remove('hidden');
+        }
+
+        function closeAddProfileModal() {
+            document.getElementById('modal-add-profile').classList.add('hidden');
+        }
+
+        function createProfile() {
+            const nameInput = document.getElementById('new-profile-name');
+            const name = nameInput.value.trim() || 'Player';
+            const emoji = document.getElementById('new-profile-emoji').value;
+            const newId = 'p_' + Date.now();
+            state.profiles.push({ id: newId, name, emoji, rating: 1200 });
+            saveLocalStorage();
+            nameInput.value = '';
+            closeAddProfileModal();
+            renderProfiles();
+        }
+
+        function updateProfileBadge() {
+            const profile = state.profiles.find(p => p.id === state.activeProfileId) || state.profiles[0];
+            if (profile) {
+                document.getElementById('badge-avatar').innerText = profile.emoji;
+                document.getElementById('badge-profilename').innerText = profile.name;
+                document.getElementById('badge-email').innerText = state.gmail || 'Signed In';
+            }
+        }
+
+        function renderBots() {
+            const list = document.getElementById('bots-list');
+            list.innerHTML = '';
+            bots.forEach(b => {
+                const isSelected = state.selectedBot === b.id;
+                const btn = document.createElement('div');
+                btn.className = `p-3 rounded-2xl border cursor-pointer flex items-center justify-between transition ${isSelected ? 'border-amber-500 bg-amber-500/10' : 'border-slate-800 bg-slate-950/50 hover:border-slate-700'}`;
+                btn.onclick = () => { state.selectedBot = b.id; renderBots(); };
+                btn.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="text-xl">${b.emoji}</div>
+                        <div>
+                            <div class="font-bold text-xs text-white">${b.name} <span class="text-amber-400">(${b.rating})</span></div>
+                            <div class="text-[10px] text-slate-400 truncate max-w-[170px]">${b.desc}</div>
+                        </div>
+                    </div>
+                    <div class="w-4 h-4 rounded-full border ${isSelected ? 'border-amber-500 bg-amber-500' : 'border-slate-700'} flex items-center justify-center shrink-0">
+                        ${isSelected ? '<div class="w-1.5 h-1.5 bg-slate-950 rounded-full"></div>' : ''}
+                    </div>
+                `;
+                list.appendChild(btn);
+            });
+        }
+
+        function setGameMode(mode) {
+            state.gameMode = mode;
+            document.getElementById('mode-bot').className = mode === 'bot' ? "p-3.5 rounded-xl border border-amber-500 bg-amber-500/10 text-amber-400 font-bold text-xs flex flex-col items-center justify-center transition shadow" : "p-3.5 rounded-xl border border-slate-800 bg-slate-900/50 text-slate-400 font-bold text-xs flex flex-col items-center justify-center transition hover:border-slate-700";
+            document.getElementById('mode-local').className = mode === 'local' ? "p-3.5 rounded-xl border border-amber-500 bg-amber-500/10 text-amber-400 font-bold text-xs flex flex-col items-center justify-center transition shadow" : "p-3.5 rounded-xl border border-slate-800 bg-slate-900/50 text-slate-400 font-bold text-xs flex flex-col items-center justify-center transition hover:border-slate-700";
+            
+            document.getElementById('bot-selection-container').style.display = mode === 'bot' ? 'block' : 'none';
+        }
+
+        function setPlayerColor(color) {
+            state.playerColor = color;
+            ['white', 'random', 'black'].forEach(c => {
+                const btn = document.getElementById(`color-${c}`);
+                if (c === color) {
+                    btn.className = "py-2.5 rounded-xl bg-slate-800 text-white font-bold text-xs border border-amber-500 transition shadow";
+                } else {
+                    btn.className = "py-2.5 rounded-xl bg-slate-900/50 text-slate-400 font-bold text-xs border border-slate-800 transition";
+                }
+            });
+        }
+
+        function switchPlayTab(tab) {
+            if (tab === 'setup') {
+                document.getElementById('pane-setup').classList.remove('hidden');
+                document.getElementById('pane-moves').classList.add('hidden');
+                document.getElementById('playtab-setup').className = "flex-1 py-2 text-xs font-bold rounded-xl bg-amber-500 text-slate-950 transition shadow";
+                document.getElementById('playtab-moves').className = "flex-1 py-2 text-xs font-bold rounded-xl text-slate-400 hover:text-white transition";
+            } else {
+                document.getElementById('pane-setup').classList.add('hidden');
+                document.getElementById('pane-moves').classList.remove('hidden');
+                document.getElementById('playtab-moves').className = "flex-1 py-2 text-xs font-bold rounded-xl bg-amber-500 text-slate-950 transition shadow";
+                document.getElementById('playtab-setup').className = "flex-1 py-2 text-xs font-bold rounded-xl text-slate-400 hover:text-white transition";
+            }
+        }
+
+        function initGame() {
+            chess = new Chess();
+            if (state.gameMode === 'bot' && state.playerColor === 'random') {
+                state.actualPlayerColor = Math.random() < 0.5 ? 'white' : 'black';
+            } else {
+                state.actualPlayerColor = state.playerColor;
+            }
+
+            const activeProfile = state.profiles.find(p => p.id === state.activeProfileId) || { name: 'Player', rating: 1200, emoji: '👑' };
+            const botObj = bots.find(b => b.id === state.selectedBot) || bots[0];
+
+            if (state.gameMode === 'bot') {
+                if (state.actualPlayerColor === 'white') {
+                    document.getElementById('player-name').innerText = activeProfile.name;
+                    document.getElementById('player-avatar').innerText = activeProfile.emoji;
+                    document.getElementById('player-rating').innerText = `Rating: ${activeProfile.rating}`;
+                    document.getElementById('opponent-name').innerText = botObj.name;
+                    document.getElementById('opponent-avatar').innerText = botObj.emoji;
+                    document.getElementById('opponent-rating').innerText = `Rating: ${botObj.rating}`;
+                } else {
+                    document.getElementById('opponent-name').innerText = activeProfile.name;
+                    document.getElementById('opponent-avatar').innerText = activeProfile.emoji;
+                    document.getElementById('opponent-rating').innerText = `Rating: ${activeProfile.rating}`;
+                    document.getElementById('player-name').innerText = botObj.name;
+                    document.getElementById('player-avatar').innerText = botObj.emoji;
+                    document.getElementById('player-rating').innerText = `Rating: ${botObj.rating}`;
+                }
+            } else {
+                document.getElementById('player-name').innerText = 'White Player';
+                document.getElementById('player-avatar').innerText = '♔';
+                document.getElementById('player-rating').innerText = 'Pass & Play';
+                document.getElementById('opponent-name').innerText = 'Black Player';
+                document.getElementById('opponent-avatar').innerText = '♚';
+                document.getElementById('opponent-rating').innerText = 'Pass & Play';
+            }
+
+            selectedSquare = null;
+            possibleMoves = [];
+            renderBoard();
+            renderMoveHistory();
+
+            if (state.gameMode === 'bot' && state.actualPlayerColor === 'black') {
+                setTimeout(makeBotMove, 400);
+            }
+        }
+
+        function startNewGame() {
+            initGame();
+        }
+
+        function renderBoard() {
+            const boardEl = document.getElementById('chessboard');
+            if (!boardEl) return;
+            boardEl.innerHTML = '';
+            
+            const theme = boardThemes.find(t => t.id === state.boardTheme) || boardThemes[0];
+            const boardData = chess.board();
+            const isFlipped = state.gameMode === 'bot' && state.actualPlayerColor === 'black';
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const actualR = isFlipped ? 7 - r : r;
+                    const actualC = isFlipped ? 7 - c : c;
+                    const squareCode = String.fromCharCode(97 + actualC) + (8 - actualR);
+
+                    const square = document.createElement('div');
+                    const isDark = (actualR + actualC) % 2 === 1;
+                    square.className = `square`;
+                    square.style.backgroundColor = isDark ? theme.dark : theme.light;
+                    square.dataset.square = squareCode;
+
+                    if (selectedSquare === squareCode) {
+                        square.classList.add('highlight-selected');
+                    }
+
+                    if (possibleMoves.includes(squareCode)) {
+                        const targetPiece = chess.get(squareCode);
+                        if (targetPiece) {
+                            square.classList.add('highlight-capture');
+                        } else {
+                            square.classList.add('highlight-move');
+                        }
+                    }
+
+                    const piece = boardData[actualR][actualC];
+                    if (piece) {
+                        const pieceContainer = document.createElement('div');
+                        pieceContainer.className = 'w-full h-full flex items-center justify-center';
+                        
+                        if (state.pieceTheme === 'svg_3d') {
+                            pieceContainer.innerHTML = svgPieces[piece.color][piece.type];
+                        } else {
+                            const minSpan = document.createElement('span');
+                            minSpan.className = 'font-black text-2xl';
+                            minSpan.style.color = piece.color === 'w' ? '#f8fafc' : '#0f172a';
+                            minSpan.innerText = minimalPieces[piece.color][piece.type];
+                            pieceContainer.appendChild(minSpan);
+                        }
+                        square.appendChild(pieceContainer);
+                    }
+
+                    square.onclick = () => handleSquareClick(squareCode);
+                    boardEl.appendChild(square);
+                }
+            }
+        }
+
+        function handleSquareClick(square) {
+            if (chess.game_over()) return;
+
+            if (state.gameMode === 'bot') {
+                const turnColor = chess.turn() === 'w' ? 'white' : 'black';
+                if (turnColor !== state.actualPlayerColor) return;
+            }
+
+            if (selectedSquare === null) {
+                const piece = chess.get(square);
+                if (piece && piece.color === chess.turn()) {
+                    selectedSquare = square;
+                    possibleMoves = chess.moves({ square: square, verbose: true }).map(m => m.to);
+                    renderBoard();
+                }
+            } else {
+                if (possibleMoves.includes(square)) {
+                    const move = chess.move({ from: selectedSquare, to: square, promotion: 'q' });
+                    if (move) {
+                        selectedSquare = null;
+                        possibleMoves = [];
+                        renderBoard();
+                        renderMoveHistory();
+                        updateGameStatus();
+
+                        if (!chess.game_over() && state.gameMode === 'bot') {
+                            setTimeout(makeBotMove, 300);
+                        }
+                    }
+                } else {
+                    const piece = chess.get(square);
+                    if (piece && piece.color === chess.turn()) {
+                        selectedSquare = square;
+                        possibleMoves = chess.moves({ square: square, verbose: true }).map(m => m.to);
+                        renderBoard();
+                    } else {
+                        selectedSquare = null;
+                        possibleMoves = [];
+                        renderBoard();
+                    }
+                }
+            }
+        }
+
+        function makeBotMove() {
+            if (chess.game_over()) return;
+            const moves = chess.moves({ verbose: true });
+            if (moves.length === 0) return;
+
+            const botObj = bots.find(b => b.id === state.selectedBot) || bots[0];
+            let selectedMove;
+
+            if (botObj.elo <= 300) {
+                selectedMove = moves[Math.floor(Math.random() * moves.length)];
+            } else {
+                const captures = moves.filter(m => m.captured);
+                if (captures.length > 0 && Math.random() < 0.7) {
+                    selectedMove = captures[Math.floor(Math.random() * captures.length)];
+                } else {
+                    selectedMove = moves[Math.floor(Math.random() * moves.length)];
+                }
+            }
+
+            chess.move(selectedMove);
+            renderBoard();
+            renderMoveHistory();
+            updateGameStatus();
+        }
+
+        function undoMove() {
+            chess.undo();
+            if (state.gameMode === 'bot') {
+                chess.undo();
+            }
+            selectedSquare = null;
+            possibleMoves = [];
+            renderBoard();
+            renderMoveHistory();
+            updateGameStatus();
+        }
+
+        function resignGame() {
+            initGame();
+        }
+
+        function updateGameStatus() {
+            const evalBar = document.getElementById('game-eval');
+            if (chess.in_checkmate()) {
+                evalBar.innerText = "Checkmate!";
+            } else if (chess.in_draw()) {
+                evalBar.innerText = "Draw!";
+            } else if (chess.in_check()) {
+                evalBar.innerText = "Check!";
+            } else {
+                evalBar.innerText = "Equal (+0.0)";
+            }
+        }
+
+        function renderMoveHistory() {
+            const list = document.getElementById('moves-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const history = chess.history({ verbose: true });
+            for (let i = 0; i < history.length; i += 2) {
+                const row = document.createElement('div');
+                const whiteMove = history[i] ? history[i].san : '';
+                const blackMove = history[i+1] ? history[i+1].san : '';
+                row.className = "flex justify-between py-1 border-b border-slate-800/60 text-slate-300";
+                row.innerHTML = `<span class="w-8 text-slate-500 font-bold">${(i/2)+1}.</span><span class="flex-1 font-semibold">${whiteMove}</span><span class="flex-1 font-semibold">${blackMove}</span>`;
+                list.appendChild(row);
+            }
+            list.scrollTop = list.scrollHeight;
+        }
+
+        function initPuzzle() {
+            currentPuzzleIndex = 0;
+            loadPuzzle(currentPuzzleIndex);
+        }
+
+        function loadPuzzle(index) {
+            const p = puzzlesList[index % puzzlesList.length];
+            puzzleGame = new Chess(p.fen);
+            document.getElementById('puzzle-title').innerText = p.title;
+            document.getElementById('puzzle-desc').innerText = p.desc;
+            renderPuzzleBoard();
+        }
+
+        function renderPuzzleBoard() {
+            const boardEl = document.getElementById('puzzle-board');
+            if (!boardEl) return;
+            boardEl.innerHTML = '';
+            const theme = boardThemes.find(t => t.id === state.boardTheme) || boardThemes[0];
+            const boardData = puzzleGame.board();
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const square = document.createElement('div');
+                    const isDark = (r + c) % 2 === 1;
+                    square.className = `square`;
+                    square.style.backgroundColor = isDark ? theme.dark : theme.light;
+                    
+                    const piece = boardData[r][c];
+                    if (piece) {
+                        const pieceContainer = document.createElement('div');
+                        pieceContainer.className = 'w-full h-full flex items-center justify-center';
+                        pieceContainer.innerHTML = svgPieces[piece.color][piece.type];
+                        square.appendChild(pieceContainer);
+                    }
+                    boardEl.appendChild(square);
+                }
+            }
+        }
+
+        function nextPuzzle() {
+            currentPuzzleIndex++;
+            loadPuzzle(currentPuzzleIndex);
+            document.getElementById('puzzle-status').innerText = "Your Turn (White)";
+        }
+
+        function hintPuzzle() {
+            const p = puzzlesList[currentPuzzleIndex % puzzlesList.length];
+            showNotification(`Hint: Try starting with move ${p.solution[0]}`);
+        }
+
+        function renderCoaches() {
+            const list = document.getElementById('coaches-list');
+            if (!list) return;
+            list.innerHTML = '';
+            coaches.forEach(c => {
+                const isSelected = state.activeCoach === c.id;
+                const card = document.createElement('div');
+                card.className = `p-3.5 rounded-2xl border cursor-pointer flex items-center space-x-3 transition ${isSelected ? 'border-amber-500 bg-amber-500/10 shadow-md' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`;
+                card.onclick = () => { selectCoach(c.id); };
+                card.innerHTML = `
+                    <div class="w-11 h-11 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-xl shrink-0 shadow-inner">${c.emoji}</div>
+                    <div class="overflow-hidden">
+                        <div class="font-bold text-xs text-white truncate">${c.name}</div>
+                        <div class="text-[10px] text-amber-400 font-semibold">${c.title}</div>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+            selectCoach(state.activeCoach);
+        }
+
+        function selectCoach(coachId) {
+            state.activeCoach = coachId;
+            const coach = coaches.find(c => c.id === coachId);
+            if (coach) {
+                document.getElementById('active-coach-avatar').innerText = coach.emoji;
+                document.getElementById('active-coach-name').innerText = coach.name;
+                document.getElementById('active-coach-title').innerText = coach.title;
+            }
+        }
+
+        function sendCoachMessage() {
+            const input = document.getElementById('coach-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const chatContainer = document.getElementById('coach-chat-messages');
+            
+            const userMsg = document.createElement('div');
+            userMsg.className = "flex items-start space-x-3 justify-end";
+            userMsg.innerHTML = `
+                <div class="bg-amber-500 text-slate-950 p-3.5 rounded-2xl max-w-md font-semibold shadow">${text}</div>
+                <div class="w-8 h-8 rounded-xl bg-amber-600 flex items-center justify-center text-xs font-bold shrink-0 shadow">You</div>
+            `;
+            chatContainer.appendChild(userMsg);
+            input.value = '';
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            setTimeout(() => {
+                const coach = coaches.find(c => c.id === state.activeCoach) || coaches[0];
+                const replies = [
+                    "Fascinating line! Remember that king safety supersedes material gains in chaotic tactical structures.",
+                    "In that exact pawn structure, knight outposts on d5 dictate the entire middlegame strategy.",
+                    "Excellent tactical awareness. Keep calculating three moves deep every single turn!",
+                    "Study classic endgame rook principles to convert those advantages effortlessly."
+                ];
+                const replyText = replies[Math.floor(Math.random() * replies.length)];
+
+                const coachMsg = document.createElement('div');
+                coachMsg.className = "flex items-start space-x-3";
+                coachMsg.innerHTML = `
+                    <div class="w-8 h-8 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-bold shrink-0 border border-slate-700">${coach.emoji}</div>
+                    <div class="glass-card border border-slate-700/80 p-3.5 rounded-2xl max-w-md text-slate-200 leading-relaxed shadow">${replyText}</div>
+                `;
+                chatContainer.appendChild(coachMsg);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }, 800);
+        }
+
+        function openHireCoachModal() {
+            const coach = coaches.find(c => c.id === state.activeCoach) || coaches[0];
+            document.getElementById('modal-coach-title').innerText = `Book Masterclass with ${coach.name}`;
+            document.getElementById('modal-hire-coach').classList.remove('hidden');
+        }
+
+        function closeHireCoachModal() {
+            document.getElementById('modal-hire-coach').classList.add('hidden');
+        }
+
+        function confirmHireCoach() {
+            showNotification('Secure payment processed successfully! Private grandmaster masterclass confirmed.');
+            closeHireCoachModal();
+        }
+
+        function renderThemes() {
+            const boardGrid = document.getElementById('board-themes-grid');
+            if (!boardGrid) return;
+            boardGrid.innerHTML = '';
+            boardThemes.forEach(t => {
+                const card = document.createElement('div');
+                const isSelected = state.boardTheme === t.id;
+                card.className = `p-4 rounded-2xl border cursor-pointer flex flex-col items-center transition ${isSelected ? 'border-amber-500 bg-amber-500/10 shadow-lg' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`;
+                card.onclick = () => { state.boardTheme = t.id; saveLocalStorage(); renderThemes(); renderBoard(); };
+                card.innerHTML = `
+                    <div class="w-16 h-16 rounded-xl grid grid-cols-2 overflow-hidden mb-3 shadow-md border border-slate-700">
+                        <div style="background-color: ${t.light}"></div>
+                        <div style="background-color: ${t.dark}"></div>
+                        <div style="background-color: ${t.dark}"></div>
+                        <div style="background-color: ${t.light}"></div>
+                    </div>
+                    <span class="font-bold text-xs text-white">${t.name}</span>
+                `;
+                boardGrid.appendChild(card);
+            });
+
+            const pieceGrid = document.getElementById('piece-themes-grid');
+            pieceGrid.innerHTML = '';
+            [
+                { id: 'svg_3d', name: 'Crisp 3D SVG Vectors', sample: svgPieces.w.n },
+                { id: 'minimal', name: 'Minimalist Typography', sample: '<span class="font-black text-2xl text-slate-200">N</span>' }
+            ].forEach(pStyle => {
+                const isSelected = state.pieceTheme === pStyle.id;
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl border cursor-pointer flex items-center justify-between transition ${isSelected ? 'border-amber-500 bg-amber-500/10 shadow-lg' : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'}`;
+                card.onclick = () => { state.pieceTheme = pStyle.id; saveLocalStorage(); renderThemes(); renderBoard(); };
+                card.innerHTML = `
+                    <span class="font-bold text-xs text-white">${pStyle.name}</span>
+                    <div class="w-10 h-10 flex items-center justify-center">${pStyle.sample}</div>
+                `;
+                pieceGrid.appendChild(card);
+            });
+        }
+
+        function showNotification(message) {
+            let notif = document.getElementById('custom-notification');
+            if (!notif) {
+                notif = document.createElement('div');
+                notif.id = 'custom-notification';
+                notif.className = 'fixed bottom-6 right-6 glass-card border border-slate-700 text-slate-100 px-5 py-3.5 rounded-2xl shadow-2xl z-50 text-xs font-bold flex items-center space-x-3 transition transform duration-300 translate-y-24';
+                document.body.appendChild(notif);
+            }
+            notif.innerHTML = `<i class="fa-solid fa-circle-info text-amber-400 text-base"></i><span>${message}</span>`;
+            setTimeout(() => notif.classList.remove('translate-y-24'), 50);
+            setTimeout(() => notif.classList.add('translate-y-24'), 3800);
+        }
+    </script>
+</body>
+</html>
